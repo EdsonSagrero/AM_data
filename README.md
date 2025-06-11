@@ -9,14 +9,14 @@ if ~isempty(serialportfind)
 end
 
 % Parámetros de la comunicación y del sistema
-comPort = 'COM6';          %(modificar) Puerto serial del Arduino
-baudRate = 115200;         %(modificar) Velocidad, debe coincidir con el Arduino
-fs_hz = 1;                 %(modificar) Frecuencia de muestreo del Arduino
+comPort = 'COM6';          %(modificar)
+baudRate = 115200;
+fs_hz = 1;                %(modificar)
 
 % Parámetros del experimento
 tiempoDeMuestreo = 5;      
-porcentajeUltimosDatos = 20; 
-minPuntosParaPromedio = 5; %(modificar) Mínimo de puntos para un promedio confiable
+minPuntosParaPromedio = 5; 
+porcentajeUltimosDatos = 20;
 
 % --- 2. ADQUISICIÓN DE DATOS ---
 numPuntos = tiempoDeMuestreo * fs_hz;
@@ -43,24 +43,19 @@ for i = 1:numPuntos
 end
 clear s; 
 
-
 % --- 3. ANÁLISIS Y GRAFICACIÓN ---
-% Calcular puntos a promediar basado en el porcentaje
 puntosCalculadosPorPorcentaje = floor(numPuntos * (porcentajeUltimosDatos / 100));
-
-
 puntosParaPromedio = max(puntosCalculadosPorPorcentaje, minPuntosParaPromedio);
-
-
 puntosParaPromedio = min(puntosParaPromedio, numPuntos);
-
-% Calcular el promedio
 inicioRango = numPuntos - puntosParaPromedio + 1;
 datosErrorEstacionario = dataMatrix(inicioRango:end, 3);
 errorEstacionarioPromedio = mean(datosErrorEstacionario);
 
+fprintf('\n--- RESULTADO DEL EXPERIMENTO ---\n');
+fprintf('Error Estacionario Promedio (e_ss): %.4f V\n', errorEstacionarioPromedio);
+fprintf('---------------------------------\n\n');
 
-% Creación de la gráfica
+% Gráfica
 figure;
 hold on;
 plot(tiempo, dataMatrix(:, 1), 'r', 'LineWidth', 1.5); 
@@ -69,10 +64,8 @@ plot(tiempo, dataMatrix(:, 3), 'b', 'LineWidth', 1.5);
 plot(tiempo, dataMatrix(:, 4), 'g', 'LineWidth', 1.5); 
 hold off;
 
-
 % Configuración de la apariencia
-tituloPrincipal = 'Comportamiento entrada-salida del sistema';
-title(tituloPrincipal); 
+title('Comportamiento entrada-salida del sistema');
 xlabel('Tiempo [s]');
 ylabel('Voltaje [V]');
 grid on;
@@ -80,7 +73,3 @@ xticks(0:0.5:5);
 xlim([0 5]);
 ylim([0 3]);
 legend('Salida, y(t)', 'Control, u(t)', 'Error, e(t)', 'Referencia, r(t)', 'Location', 'northeast');
-
-% Añadir el valor del error como texto en la gráfica
-textoError = sprintf('e_{ss} = %.4f V', errorEstacionarioPromedio);
-text(0.5, 2.5, textoError, 'FontSize', 10);
