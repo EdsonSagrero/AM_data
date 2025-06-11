@@ -1,78 +1,86 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Codigo de Matlab para la trasferencia de datos de Arduino %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% --- 1. CONFIGURACIÓN Y PARÁMETROS ---
 clear; clc; close all;
 
-% --- 1. Limpieza de puertos previos ---
 if ~isempty(serialportfind)
-    fclose(serialportfind);
-    delete(serialportfind);
+     fclose(serialportfind);
+     delete(serialportfind);
 end
 
-% --- 2. Configuración del Puerto Serial ---
-comPort = 'COM6';       % Puerto a utilizar (Modificar)
-baudRate = 115200;      % Velocidad de comunicación
-fs_hz = 100;            % Frecuencia de muestreo definida en Arduino (Modificar)
+% Parámetros de la comunicación y del sistema
+comPort = 'COM6';          %(modificar) Puerto serial del Arduino
+baudRate = 115200;         %(modificar) Velocidad, debe coincidir con el Arduino
+fs_hz = 1;                 %(modificar) Frecuencia de muestreo del Arduino
 
-% Parámetros de captura de datos
-tiempoDeMuestreo = 5;   % Duración de adquisición (segundos)
+% Parámetros del experimento
+tiempoDeMuestreo = 5;      
+porcentajeUltimosDatos = 20; 
+minPuntosParaPromedio = 5; %(modificar) Mínimo de puntos para un promedio confiable
+
+% --- 2. ADQUISICIÓN DE DATOS ---
 numPuntos = tiempoDeMuestreo * fs_hz;
+tiempo = (0:numPuntos-1) / fs_hz; 
+dataMatrix = zeros(numPuntos, 4); 
 
-% --- 3. Establecer Conexión con Arduino ---
 try
-    disp('Estableciendo conexión con Arduino...');
     s = serialport(comPort, baudRate);
     configureTerminator(s, "LF"); 
-    disp('¡Conexión exitosa!');
 catch e
-    disp('Error: No se pudo conectar al puerto.');
-    disp(['Verifique que el Arduino está conectado y el puerto ' comPort ' es correcto.']);
-    disp(['Error original: ' e.message]);
-    return;
+    error(['No se pudo conectar al puerto ' comPort '. Verifique la conexión.']);
 end
 
-% --- 4. Preparación para la Captura ---
-disp('Esperando la inicialización del Arduino (4 segundos)...');
-pause(4.5);
-
-% Lee y muestra la línea de encabezado
-header = readline(s);
-disp(['Encabezado recibido: ' header]);
-
-% Pre-asignación de memoria para los datos
-dataMatrix = zeros(numPuntos, 4); 
-tiempo = (0.5:0.5:5)'; 
-
-% --- 5. Captura de Datos ---
-disp(['Iniciando la captura de datos durante ' num2str(tiempoDeMuestreo) ' segundos...']);
-tic; 
+pause(4.5); 
 
 for i = 1:numPuntos
     rawData = readline(s);
     parsedData = str2double(strsplit(rawData, ','));
-
     if numel(parsedData) == 4
         dataMatrix(i, :) = parsedData;
-    else
-        if i > 1
-            dataMatrix(i, :) = dataMatrix(i-1, :);
-        end
-        disp(['Advertencia: Se recibió una línea de datos incompleta en la muestra ' num2str(i)]);
+    elseif i > 1
+        dataMatrix(i, :) = dataMatrix(i-1, :);
     end
 end
+clear s; 
 
-tiempoTranscurrido = toc;
-disp(['Captura finalizada en ' num2str(tiempoTranscurrido, '%.2f') ' segundos.']);
-disp('Generando gráfica...');
 
-% --- 6. Graficación de Datos ---
+% --- 3. ANÁLISIS Y GRAFICACIÓN ---
+% Calcular puntos a promediar basado en el porcentaje
+puntosCalculadosPorPorcentaje = floor(numPuntos * (porcentajeUltimosDatos / 100));
+
+
+puntosParaPromedio = max(puntosCalculadosPorPorcentaje, minPuntosParaPromedio);
+
+
+puntosParaPromedio = min(puntosParaPromedio, numPuntos);
+
+% Calcular el promedio
+inicioRango = numPuntos - puntosParaPromedio + 1;
+datosErrorEstacionario = dataMatrix(inicioRango:end, 3);
+errorEstacionarioPromedio = mean(datosErrorEstacionario);
+
+
+% Creación de la gráfica
 figure;
-plot(tiempo, dataMatrix(1:length(tiempo),1), 'b', 'LineWidth', 1.5); hold on;
-plot(tiempo, dataMatrix(1:length(tiempo),2), 'r', 'LineWidth', 1.5);
-xlabel('Tiempo (s)');
-ylabel('Voltaje (V)');
-title('Comportamiento entrada-salida del sistema');
-legend('Entrada u(t)', 'Salida y(t)', 'Location', 'best');
-grid on;
+hold on;
+plot(tiempo, dataMatrix(:, 1), 'r', 'LineWidth', 1.5); 
+plot(tiempo, dataMatrix(:, 2), 'k', 'LineWidth', 1.5); 
+plot(tiempo, dataMatrix(:, 3), 'b', 'LineWidth', 1.5); 
+plot(tiempo, dataMatrix(:, 4), 'g', 'LineWidth', 1.5); 
+hold off;
 
-disp('Proceso finalizado.');
-clear s;
+
+% Configuración de la apariencia
+tituloPrincipal = 'Comportamiento entrada-salida del sistema';
+title(tituloPrincipal); 
+xlabel('Tiempo [s]');
+ylabel('Voltaje [V]');
+grid on;
+xticks(0:0.5:5);
+xlim([0 5]);
+ylim([0 3]);
+legend('Salida, y(t)', 'Control, u(t)', 'Error, e(t)', 'Referencia, r(t)', 'Location', 'northeast');
+
+% Añadir el valor del error como texto en la gráfica
+textoError = sprintf('e_{ss} = %.4f V', errorEstacionarioPromedio);
+text(0.5, 2.5, textoError, 'FontSize', 10);
