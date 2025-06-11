@@ -1,3 +1,4 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% Codigo de Matlab (modificar los datos de acuerdo a la especificacion) %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear; clc; close all;
 
 % Verifica y cierra puertos seriales abiertos
